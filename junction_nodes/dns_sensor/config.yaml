@@ -1,0 +1,44 @@
+sensor:
+  sensor_id: "dns-sensor-01"
+  sensor_type: "DNS"
+  heartbeat_interval_sec: 30
+  log_level: "INFO"
+  buffer_max_size: 10000
+
+kafka:
+  bootstrap_servers: "localhost:9092"
+  client_id: "dns-sensor-01"
+  compression_type: "lz4"
+  batch_size: 16384
+  linger_ms: 100
+  acks: "all"
+
+dns_capture:
+  # Interface to capture on (null = all interfaces)
+  interface: null
+  # BPF filter for DNS traffic
+  bpf_filter: "udp port 53"
+  # Enable simulated mode (generates fake DNS events for testing without root/pcap)
+  simulated_mode: true
+  # Events per second in simulated mode
+  simulated_eps: 10
+  # Suspicious TLD list for basic flagging
+  suspicious_tlds:
+    - ".xyz"
+    - ".top"
+    - ".tk"
+    - ".ml"
+    - ".ga"
+    - ".cf"
+    - ".pw"
+    - ".cc"
+    - ".ru"
+  # Known DGA patterns (regex)
+  dga_patterns:
+    - "^[a-z]{15,}\\.(com|net|org)$"
+    - "^[a-z0-9]{20,}\\.(xyz|top|tk)$"
+  # DNS tunneling detection thresholds
+  tunneling_detection:
+    min_query_length: 50  # Suspiciously long subdomain
+    max_txt_response_size: 512  # Large TXT responses
+    entropy_threshold: 3.5  # Shannon entropy threshold for subdomain
