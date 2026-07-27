@@ -1,22 +1,26 @@
-.PHONY: help up down down-clean logs logs-kafka create-topics run-dns-sensor run-simulator test lint clean status
+.PHONY: help up down down-clean logs logs-kafka create-topics run-dns-sensor run-processor run-simulator test lint clean status
 
-# Default target
 help:
 	@echo "CyberTrace-Graph Makefile"
 	@echo ""
-	@echo "Targets:"
-	@echo "  up               - Start docker compose infrastructure in detached mode"
+	@echo "Infrastructure:"
+	@echo "  up               - Start docker compose infrastructure"
 	@echo "  down             - Stop docker compose infrastructure"
-	@echo "  down-clean       - Stop docker compose infrastructure and remove volumes"
-	@echo "  logs             - Follow docker compose logs"
-	@echo "  logs-kafka       - Follow docker compose logs for kafka service"
-	@echo "  create-topics    - Run script to create Kafka topics"
+	@echo "  down-clean       - Stop infrastructure and remove volumes"
+	@echo "  logs             - Follow all service logs"
+	@echo "  logs-kafka       - Follow Kafka logs"
+	@echo "  status           - Show service status"
+	@echo "  create-topics    - Create Kafka topics"
+	@echo ""
+	@echo "Services:"
 	@echo "  run-dns-sensor   - Run the DNS sensor junction node"
+	@echo "  run-processor    - Run the stream processor pipeline"
 	@echo "  run-simulator    - Run the APT attack simulator"
-	@echo "  test             - Run pytest"
+	@echo ""
+	@echo "Development:"
+	@echo "  test             - Run pytest suite"
 	@echo "  lint             - Run flake8 and mypy"
-	@echo "  clean            - Remove __pycache__ and .pytest_cache directories"
-	@echo "  status           - Show docker compose status"
+	@echo "  clean            - Remove cache directories"
 
 up:
 	docker compose up -d
@@ -37,7 +41,10 @@ create-topics:
 	python scripts/create_topics.py
 
 run-dns-sensor:
-	cd junction_nodes/dns_sensor && python main.py
+	python -m junction_nodes.dns_sensor.main
+
+run-processor:
+	python -m junction_nodes.stream_processor.main
 
 run-simulator:
 	cd attack_simulator && python simulate_apt.py
