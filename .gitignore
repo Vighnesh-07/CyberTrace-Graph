@@ -196,3 +196,5 @@ Thumbs.db
 logs/
 *.log
 data/
+neo4j_logs*.txt
+attack_simulator/output/

@@ -1,0 +1,16 @@
+processor:
+  group_id: "cybertrace-graph-ingestor-01"
+  log_level: "INFO"
+  detection_interval: 300  # Run graph detections every 5 minutes
+
+kafka:
+  bootstrap_servers: "localhost:9092"
+
+neo4j:
+  uri: "bolt://localhost:7687"
+  user: "neo4j"
+  password: "apthunter2024"
+
+input_topics:
+  - "apt.events.enriched"
+  - "apt.alerts.raw"

@@ -1,4 +1,4 @@
-.PHONY: help up down down-clean logs logs-kafka create-topics run-dns-sensor run-processor run-simulator test lint clean status
+.PHONY: help up down down-clean logs logs-kafka create-topics run-dns-sensor run-processor run-ingestor run-simulator run-detections test lint clean status
 
 help:
 	@echo "CyberTrace-Graph Makefile"
@@ -15,7 +15,9 @@ help:
 	@echo "Services:"
 	@echo "  run-dns-sensor   - Run the DNS sensor junction node"
 	@echo "  run-processor    - Run the stream processor pipeline"
+	@echo "  run-ingestor     - Run the graph correlation ingestor"
 	@echo "  run-simulator    - Run the APT attack simulator"
+	@echo "  run-detections   - Run graph detection queries once"
 	@echo ""
 	@echo "Development:"
 	@echo "  test             - Run pytest suite"
@@ -46,8 +48,14 @@ run-dns-sensor:
 run-processor:
 	python -m junction_nodes.stream_processor.main
 
+run-ingestor:
+	python -m junction_nodes.correlation_engine.main
+
 run-simulator:
 	cd attack_simulator && python simulate_apt.py
+
+run-detections:
+	python -c "from junction_nodes.common.config import Neo4jConfig; from junction_nodes.correlation_engine.graph_service import GraphService; from junction_nodes.correlation_engine.detectors import GraphDetector; import json; gs = GraphService(Neo4jConfig()); gd = GraphDetector(gs); print(json.dumps(gd.run_all_detections(), indent=2, default=str)); print(json.dumps(gs.get_stats(), indent=2, default=str)); gs.close()"
 
 test:
 	pytest tests/ -v

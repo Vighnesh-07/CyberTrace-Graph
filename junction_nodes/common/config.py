@@ -28,7 +28,7 @@ class SensorConfig(BaseModel):
 class Neo4jConfig(BaseModel):
     uri: str = "bolt://localhost:7687"
     user: str = "neo4j"
-    password: str = "password"
+    password: str = "apthunter2024"
 
 class RedisConfig(BaseModel):
     url: str = "redis://localhost:6379/0"
