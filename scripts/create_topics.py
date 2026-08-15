@@ -26,6 +26,7 @@ def create_kafka_topics():
         {"name": "apt.events.endpoint", "partitions": 6, "replication": 1},
         {"name": "apt.events.auth", "partitions": 3, "replication": 1},
         {"name": "apt.events.cloud", "partitions": 3, "replication": 1},
+        {"name": "apt.events.enriched", "partitions": 6, "replication": 1},
         {"name": "apt.alerts.raw", "partitions": 3, "replication": 1},
         {"name": "apt.alerts.correlated", "partitions": 3, "replication": 1},
         {"name": "apt.system.heartbeat", "partitions": 1, "replication": 1},

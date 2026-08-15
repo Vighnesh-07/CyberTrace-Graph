@@ -102,9 +102,7 @@ def assess_severity(event: DNSEvent, engine: "DNSCaptureEngine") -> DNSEvent:
         event.confidence_score = min(0.5 + (entropy - engine.entropy_threshold) * 0.2, 1.0)
         event.tags.append("dns_tunneling")
         logger.info(
-            "DNS tunneling detected",
-            domain=event.query_name,
-            entropy=round(entropy, 2),
+            f"DNS tunneling detected | domain={event.query_name} | entropy={round(entropy, 2)}"
         )
     # Check for DGA domains
     elif check_dga(event.query_name, engine.dga_patterns):
@@ -113,7 +111,7 @@ def assess_severity(event: DNSEvent, engine: "DNSCaptureEngine") -> DNSEvent:
         event.mitre_technique = "T1568.002"  # Dynamic Resolution: DGA
         event.confidence_score = 0.75
         event.tags.append("dga")
-        logger.info("DGA domain detected", domain=event.query_name)
+        logger.info(f"DGA domain detected | domain={event.query_name}")
     # Check for suspicious TLDs
     elif check_suspicious_tld(event.query_name, engine.suspicious_tlds):
         event.severity = SeverityLevel.MEDIUM

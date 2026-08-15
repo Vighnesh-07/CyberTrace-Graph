@@ -52,7 +52,7 @@ run-ingestor:
 	python -m junction_nodes.correlation_engine.main
 
 run-simulator:
-	cd attack_simulator && python simulate_apt.py
+	python -m attack_simulator.simulate_apt
 
 run-detections:
 	python -c "from junction_nodes.common.config import Neo4jConfig; from junction_nodes.correlation_engine.graph_service import GraphService; from junction_nodes.correlation_engine.detectors import GraphDetector; import json; gs = GraphService(Neo4jConfig()); gd = GraphDetector(gs); print(json.dumps(gd.run_all_detections(), indent=2, default=str)); print(json.dumps(gs.get_stats(), indent=2, default=str)); gs.close()"

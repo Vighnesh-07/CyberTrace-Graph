@@ -96,7 +96,7 @@ class GraphService:
                 "MERGE (a:Alert {alert_id: $alert_id}) "
                 "ON CREATE SET a.alert_type = $alert_type, a.severity = $severity, "
                 "a.confidence_score = $confidence, a.title = $title, a.description = $description, "
-                "a.timestamp = datetime($ts), a.status = $status",
+                "a.timestamp = datetime($ts), a.status = $status, a.source_ip = $source_ip",
                 alert_id=alert_dict.get("alert_id", ""),
                 alert_type=alert_dict.get("alert_type", ""),
                 severity=alert_dict.get("severity", ""),
@@ -104,7 +104,8 @@ class GraphService:
                 title=alert_dict.get("title", ""),
                 description=alert_dict.get("description", ""),
                 ts=alert_dict.get("timestamp", datetime.now(timezone.utc).isoformat()),
-                status=alert_dict.get("status", "OPEN")
+                status=alert_dict.get("status", "OPEN"),
+                source_ip=alert_dict.get("source_ip", "")
             )
             self._stats["nodes_created"] += 1
     

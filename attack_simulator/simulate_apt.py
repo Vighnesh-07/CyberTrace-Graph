@@ -29,6 +29,10 @@ def main():
     dns_parser.add_argument("--c2-domain", type=str, default="data.evil-c2-server.xyz", help="C2 Domain")
     dns_parser.add_argument("--output", type=str, choices=["json", "kafka"], default="json", help="Output destination")
     
+    kill_chain_parser = subparsers.add_parser("kill-chain", help="Simulate multi-stage lateral movement kill chain")
+    kill_chain_parser.add_argument("--duration", type=int, default=300, help="Simulation duration in seconds")
+    kill_chain_parser.add_argument("--output", type=str, choices=["json", "kafka"], default="json", help="Output destination")
+    
     list_parser = subparsers.add_parser("list", help="List available scenarios")
     
     args = parser.parse_args()
@@ -36,15 +40,21 @@ def main():
     if args.command == "list":
         print("\033[1mAvailable Scenarios:\033[0m")
         print("  - dns-tunnel : Simulates data exfiltration via DNS queries")
+        print("  - kill-chain : Simulates a 4-stage lateral movement attack")
         sys.exit(0)
         
-    elif args.command == "dns-tunnel":
-        scenario = DNSTunnelingScenario(c2_domain=args.c2_domain)
+    elif args.command in ["dns-tunnel", "kill-chain"]:
+        if args.command == "dns-tunnel":
+            scenario = DNSTunnelingScenario(c2_domain=args.c2_domain)
+        else:
+            from attack_simulator.scenarios.kill_chain import KillChainScenario
+            scenario = KillChainScenario()
+            
         events = scenario.generate_events(duration_seconds=args.duration)
         
         if args.output == "json":
             os.makedirs(os.path.join(os.path.dirname(__file__), "output"), exist_ok=True)
-            output_file = os.path.join(os.path.dirname(__file__), "output", "dns_tunnel_events.json")
+            output_file = os.path.join(os.path.dirname(__file__), "output", f"{args.command.replace('-', '_')}_events.json")
             with open(output_file, "w") as f:
                 json.dump([json.loads(e.model_dump_json()) for e in events], f, indent=2)
             print(f"\033[94mSaved events to {output_file}\033[0m")
@@ -54,7 +64,12 @@ def main():
             producer = KafkaEventProducer(config)
             print("\033[93mSending events to Kafka...\033[0m")
             for e in events:
-                producer.produce("apt.events.dns", e)
+                topic = "apt.events.dns"
+                if e.event_type in ["AUTH_LOGIN", "AUTH_FAILURE"]:
+                    topic = "apt.events.auth"
+                elif e.event_type == "NETWORK_CONNECTION":
+                    topic = "apt.events.network"
+                producer.produce(topic, e)
             producer.flush()
             print("\033[94mFinished sending to Kafka.\033[0m")
             

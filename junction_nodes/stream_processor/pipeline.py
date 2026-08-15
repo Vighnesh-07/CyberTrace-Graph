@@ -2,14 +2,14 @@
 Main stream processing pipeline for CyberTrace-Graph.
 
 Consumes raw security events from Kafka, enriches them with
-GeoIP and threat intel data, runs detection algorithms, and
-produces alerts to output topics.
+GeoIP and threat intel data, runs detection algorithms (including
+ML-powered models), and produces alerts to output topics.
 
 Pipeline stages:
 1. Consume raw events from apt.events.* topics
 2. Enrich with GeoIP data
 3. Match against threat intelligence feeds
-4. Run through detection algorithms (beaconing, DNS anomaly)
+4. Run through detection algorithms (beaconing, DNS anomaly, ML models)
 5. Produce enriched events to downstream topics
 6. Produce alerts to apt.alerts.raw topic
 """
@@ -27,6 +27,8 @@ from junction_nodes.stream_processor.enrichment.threat_intel import ThreatIntelS
 from junction_nodes.stream_processor.detectors.beaconing import BeaconingDetector
 from junction_nodes.stream_processor.detectors.dns_anomaly import DNSAnomalyDetector
 
+from junction_nodes.stream_processor.detectors.brute_force import LateralMovementDetector
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,8 +36,8 @@ class ProcessingPipeline:
     """Main stream processing pipeline.
 
     Consumes raw security events from Kafka, enriches them with
-    GeoIP and threat intel data, runs detection algorithms, and
-    produces alerts to output topics.
+    GeoIP and threat intel data, runs ML-powered detection algorithms,
+    and produces alerts to output topics.
     """
 
     def __init__(self, kafka_config: KafkaConfig, processor_config: dict):
@@ -59,7 +61,12 @@ class ProcessingPipeline:
         self.geoip_service = GeoIPService()
         self.threat_intel_service = ThreatIntelService()
 
-        # Detection engines
+        # ── ML Models ───────────────────────────────────────────────────
+        self.dga_classifier = None
+        self.anomaly_detector = None
+        self._init_ml_models(processor_config)
+
+        # ── Detection engines ───────────────────────────────────────────
         detector_cfg = processor_config.get("detectors", {})
 
         beacon_cfg = detector_cfg.get("beaconing", {})
@@ -67,6 +74,7 @@ class ProcessingPipeline:
             window_seconds=beacon_cfg.get("window_seconds", 300),
             min_samples=beacon_cfg.get("min_samples", 5),
             cv_threshold=beacon_cfg.get("cv_threshold", 0.3),
+            anomaly_detector=self.anomaly_detector,
         )
 
         dns_cfg = detector_cfg.get("dns_anomaly", {})
@@ -76,16 +84,86 @@ class ProcessingPipeline:
             max_query_rate=dns_cfg.get("max_query_rate", 200),
             txt_ratio_threshold=dns_cfg.get("txt_ratio_threshold", 0.3),
             nxdomain_ratio_threshold=dns_cfg.get("nxdomain_ratio_threshold", 0.5),
+            dga_classifier=self.dga_classifier,
         )
+        
+        self.lateral_detector = LateralMovementDetector()
 
         self._running = False
         self._stats = {
             "events_processed": 0,
             "events_enriched": 0,
             "alerts_generated": 0,
+            "ml_dga_detections": 0,
+            "ml_anomaly_detections": 0,
             "errors": 0,
         }
-        self.stats_interval = processor_config.get("processor", {}).get("stats_interval", 500)
+        self.stats_interval = processor_config.get("processor", {}).get("stats_interval", 50)
+        
+        # Redis for dashboard stats
+        try:
+            import redis
+            import json
+            self.redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+            self.redis_client.ping()
+            logger.info("Connected to Redis for stats publishing.")
+        except Exception as e:
+            logger.warning(f"Failed to connect to Redis: {e}")
+            self.redis_client = None
+
+    # ── ML Initialization ───────────────────────────────────────────────
+
+    def _init_ml_models(self, processor_config: dict):
+        """Initialize and train ML models at startup using synthetic data."""
+        ml_cfg = processor_config.get("ml_models", {})
+        enable_ml = ml_cfg.get("enabled", True)
+
+        if not enable_ml:
+            logger.info("🤖 ML models disabled by configuration.")
+            return
+
+        logger.info("🤖 Initializing ML models...")
+
+        # 1. DGA Classifier (Random Forest)
+        try:
+            from junction_nodes.stream_processor.ml_models.dga_classifier import DGAClassifier
+
+            self.dga_classifier = DGAClassifier()
+            dga_cfg = ml_cfg.get("dga_classifier", {})
+            metrics = self.dga_classifier.train(
+                n_benign=dga_cfg.get("n_benign", 8000),
+                n_dga=dga_cfg.get("n_dga", 8000),
+            )
+            logger.info(
+                "✅ DGA Classifier trained — Accuracy: %.3f | Precision: %.3f | Recall: %.3f | F1: %.3f",
+                metrics["accuracy"],
+                metrics["precision"],
+                metrics["recall"],
+                metrics["f1"],
+            )
+        except Exception as e:
+            logger.error("❌ Failed to initialize DGA Classifier: %s", e, exc_info=True)
+            self.dga_classifier = None
+
+        # 2. Network Anomaly Detector (Isolation Forest)
+        try:
+            from junction_nodes.stream_processor.ml_models.isolation_forest import NetworkAnomalyDetector
+
+            self.anomaly_detector = NetworkAnomalyDetector()
+            iso_cfg = ml_cfg.get("isolation_forest", {})
+            train_result = self.anomaly_detector.train(
+                n_normal=iso_cfg.get("n_normal", 10000),
+                contamination=iso_cfg.get("contamination", 0.05),
+            )
+            logger.info(
+                "✅ Isolation Forest trained — Samples: %d | Contamination: %.2f | Features: %s",
+                train_result["samples_trained"],
+                train_result["contamination"],
+                train_result["features"],
+            )
+        except Exception as e:
+            logger.error("❌ Failed to initialize Isolation Forest: %s", e, exc_info=True)
+            self.anomaly_detector = None
 
     # ── Stage 2-3: Enrichment ───────────────────────────────────────────
 
@@ -151,15 +229,33 @@ class ProcessingPipeline:
             dns_alerts = self.dns_detector.add_event(event_dict)
             if dns_alerts:
                 alerts.extend(dns_alerts)
+                # Track ML-specific detections for stats
+                for alert in dns_alerts:
+                    if "ml_detection" in alert.tags:
+                        self._stats["ml_dga_detections"] += 1
             beacon_alert = self.beaconing_detector.add_event(event_dict)
             if beacon_alert:
                 alerts.append(beacon_alert)
+                if "ml_correlated" in beacon_alert.tags:
+                    self._stats["ml_anomaly_detections"] += 1
 
-        # Network events → beaconing detector only
+        # Network events → beaconing detector + lateral movement
         elif event_type == "NETWORK_CONNECTION":
             beacon_alert = self.beaconing_detector.add_event(event_dict)
             if beacon_alert:
                 alerts.append(beacon_alert)
+                if "ml_correlated" in beacon_alert.tags:
+                    self._stats["ml_anomaly_detections"] += 1
+            
+            lm_alerts = self.lateral_detector.add_event(event_dict)
+            if lm_alerts:
+                alerts.extend(lm_alerts)
+                
+        # Auth events → lateral movement / brute force
+        elif event_type in ["AUTH_LOGIN", "AUTH_FAILURE"]:
+            lm_alerts = self.lateral_detector.add_event(event_dict)
+            if lm_alerts:
+                alerts.extend(lm_alerts)
 
         return alerts
 
@@ -214,6 +310,12 @@ class ProcessingPipeline:
                 and self._stats["events_processed"] > 0
             ):
                 logger.info("📊 Pipeline stats: %s", self._stats)
+                if getattr(self, 'redis_client', None):
+                    import json
+                    try:
+                        self.redis_client.set("pipeline:stats", json.dumps(self._stats), ex=60)
+                    except Exception as e:
+                        logger.error(f"Failed to push stats to Redis: {e}")
 
     def stop(self):
         """Gracefully stop the pipeline."""

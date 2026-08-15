@@ -1,16 +1,35 @@
+"""
+DNS Anomaly Detector with ML-powered DGA Classification.
+
+Detects DNS anomalies using windowed aggregation and a Random Forest
+DGA classifier. Combines statistical thresholds with ML predictions
+for high-fidelity alerting.
+
+Detection capabilities:
+- High query rate (data exfiltration indicator)
+- Excessive unique domains (DGA indicator)
+- High TXT query ratio (DNS tunneling indicator)
+- High NXDOMAIN ratio (DGA indicator)
+- ML-based DGA domain classification
+"""
+
 import math
 import time
+import logging
 from dataclasses import dataclass, field
+from typing import Optional
 from junction_nodes.stream_processor.models.alerts import AlertEvent, AlertType
 from junction_nodes.common.models.events import SeverityLevel
 
+logger = logging.getLogger(__name__)
+
 @dataclass
 class SourceWindow:
-    queries: list[dict] = field(default_factory=list)  # list of {timestamp, domain, query_type, response_code, entropy}
+    queries: list[dict] = field(default_factory=list)
     start_time: float = field(default_factory=time.time)
 
 class DNSAnomalyDetector:
-    """Detects DNS anomalies using windowed aggregation.
+    """Detects DNS anomalies using windowed aggregation + ML-powered DGA detection.
     
     Tracks per-source-IP statistics in a sliding window:
     - Total query count
@@ -18,21 +37,28 @@ class DNSAnomalyDetector:
     - Average query entropy
     - TXT query ratio
     - NXDOMAIN ratio
+    - ML DGA classification scores
     
-    Fires alerts when thresholds are exceeded.
+    Fires alerts when thresholds are exceeded or when the ML model
+    classifies domains as algorithmically generated.
     """
     
     def __init__(self, window_seconds: int = 300, 
                  max_unique_domains: int = 100,
                  max_query_rate: int = 200,
                  txt_ratio_threshold: float = 0.3,
-                 nxdomain_ratio_threshold: float = 0.5):
+                 nxdomain_ratio_threshold: float = 0.5,
+                 dga_classifier=None):
         self.window_seconds = window_seconds
         self.max_unique_domains = max_unique_domains
         self.max_query_rate = max_query_rate
         self.txt_ratio_threshold = txt_ratio_threshold
         self.nxdomain_ratio_threshold = nxdomain_ratio_threshold
-        self._windows: dict[str, SourceWindow] = {}  # source_ip -> window data
+        self.dga_classifier = dga_classifier
+        self._windows: dict[str, SourceWindow] = {}
+        # Track DGA hits per source IP within window for aggregated alerting
+        self._dga_hits: dict[str, list[dict]] = {}
+        self._dga_alert_cooldown: dict[str, float] = {}
     
     def add_event(self, event_dict: dict) -> list[AlertEvent]:
         """Process a DNS event. Returns list of AlertEvents if anomalies detected.
@@ -42,6 +68,7 @@ class DNSAnomalyDetector:
         2. Too many unique domains (> max_unique_domains) -> DGA_DOMAIN
         3. High TXT query ratio (> txt_ratio_threshold) -> DNS_TUNNELING
         4. High NXDOMAIN ratio (> nxdomain_ratio_threshold) -> DGA_DOMAIN
+        5. ML DGA classification on individual domains -> DGA_DOMAIN
         """
         if event_dict.get('event_type') != 'DNS_QUERY':
             return []
@@ -64,12 +91,22 @@ class DNSAnomalyDetector:
             current_time = time.time()
         
         entropy = self._calculate_entropy(domain)
+        
+        # Run ML DGA classification if available
+        dga_result = None
+        if self.dga_classifier and self.dga_classifier.is_trained and domain:
+            try:
+                dga_result = self.dga_classifier.predict(domain)
+            except Exception as e:
+                logger.debug(f"DGA classifier error for {domain}: {e}")
+        
         window.queries.append({
             'timestamp': current_time,
             'domain': domain,
             'query_type': query_type,
             'response_code': response_code,
-            'entropy': entropy
+            'entropy': entropy,
+            'dga_result': dga_result
         })
         
         self._prune_window(window, current_time)
@@ -140,7 +177,46 @@ class DNSAnomalyDetector:
                 mitre_technique="T1568",
                 evidence={"nxdomain_ratio": nxdomain_ratio, "nxdomains": nxdomains, "total_queries": num_queries}
             ))
+
+        # 5. ML DGA Classification — aggregated alerting
+        if dga_result and dga_result.get('is_dga') and dga_result.get('confidence', 0) > 0.7:
+            if source_ip not in self._dga_hits:
+                self._dga_hits[source_ip] = []
+            self._dga_hits[source_ip].append({
+                'domain': domain,
+                'confidence': dga_result['confidence'],
+                'timestamp': current_time
+            })
+            # Prune old DGA hits
+            cutoff = current_time - 60  # 60-second aggregation window
+            self._dga_hits[source_ip] = [
+                h for h in self._dga_hits[source_ip] if h['timestamp'] >= cutoff
+            ]
             
+            # Fire aggregated alert if 5+ DGA domains in 60s and not in cooldown
+            last_alert_time = self._dga_alert_cooldown.get(source_ip, 0)
+            if len(self._dga_hits[source_ip]) >= 5 and (current_time - last_alert_time) > 30:
+                avg_confidence = sum(h['confidence'] for h in self._dga_hits[source_ip]) / len(self._dga_hits[source_ip])
+                sample_domains = [h['domain'] for h in self._dga_hits[source_ip][:5]]
+                alerts.append(AlertEvent(
+                    alert_type=AlertType.DGA_DOMAIN,
+                    title="ML-Detected DGA Activity Cluster",
+                    description=f"ML classifier detected {len(self._dga_hits[source_ip])} algorithmically generated domains from {source_ip} in 60s.",
+                    severity=SeverityLevel.HIGH,
+                    confidence_score=min(avg_confidence, 0.99),
+                    source_ip=source_ip,
+                    mitre_tactic="TA0011",
+                    mitre_technique="T1568.002",
+                    evidence={
+                        "ml_dga_count": len(self._dga_hits[source_ip]),
+                        "avg_ml_confidence": round(avg_confidence, 3),
+                        "sample_domains": sample_domains,
+                        "detection_method": "RandomForest_DGA_Classifier"
+                    },
+                    tags=["ml_detection", "dga_cluster"]
+                ))
+                self._dga_alert_cooldown[source_ip] = current_time
+
         return alerts
     
     def _get_or_create_window(self, source_ip: str) -> SourceWindow:
