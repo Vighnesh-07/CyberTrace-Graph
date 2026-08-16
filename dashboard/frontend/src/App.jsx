@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './AuthContext'
 import Sidebar from './components/Sidebar'
+import TopHeader from './components/TopHeader'
 import DashboardPage from './pages/DashboardPage'
 import AlertsPage from './pages/AlertsPage'
 import GraphPage from './pages/GraphPage'
@@ -20,6 +21,7 @@ function MainLayout() {
   return (
     <div className="app-layout">
       <Sidebar />
+      <TopHeader />
       <main className="main-content">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
