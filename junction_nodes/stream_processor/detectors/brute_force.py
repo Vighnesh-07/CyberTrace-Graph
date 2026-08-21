@@ -28,6 +28,18 @@ class LateralMovementDetector:
         # dict: {source_ip: True if compromised else False}
         self.compromised_hosts = {}
 
+    def _parse_timestamp(self, ts) -> datetime:
+        if isinstance(ts, datetime):
+            return ts
+        if isinstance(ts, (int, float)):
+            return datetime.fromtimestamp(ts, tz=timezone.utc)
+        if isinstance(ts, str):
+            try:
+                return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                pass
+        return datetime.now(timezone.utc)
+
     def _cleanup_old_events(self, current_time: datetime):
         cutoff = current_time - timedelta(seconds=self.window_seconds)
         for src in list(self.auth_failures.keys()):
@@ -44,7 +56,7 @@ class LateralMovementDetector:
         alerts = []
         event_type = event_dict.get("event_type", "")
         source_ip = event_dict.get("source_ip")
-        ts = event_dict.get("timestamp", datetime.now(timezone.utc))
+        ts = self._parse_timestamp(event_dict.get("timestamp"))
 
         if not source_ip:
             return alerts
