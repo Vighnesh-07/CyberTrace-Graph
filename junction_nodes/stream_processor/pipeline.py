@@ -88,6 +88,9 @@ class ProcessingPipeline:
         )
         
         self.lateral_detector = LateralMovementDetector()
+        
+        from junction_nodes.stream_processor.detectors.ransomware import RansomwareDetector
+        self.ransomware_detector = RansomwareDetector()
 
         self._running = False
         self._stats = {
@@ -256,6 +259,12 @@ class ProcessingPipeline:
             lm_alerts = self.lateral_detector.add_event(event_dict)
             if lm_alerts:
                 alerts.extend(lm_alerts)
+                
+        # Process events → ransomware detector
+        elif event_type == "PROCESS_CREATION":
+            ransomware_alerts = self.ransomware_detector.add_event(event_dict)
+            if ransomware_alerts:
+                alerts.extend(ransomware_alerts)
 
         return alerts
 

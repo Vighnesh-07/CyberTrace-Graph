@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { fetchPipelineHealth } from '../api'
+import { fetchPipelineHealth, fetchAlerts } from '../api'
 import { useAuth } from '../AuthContext'
 import {
   LayoutDashboard,
@@ -20,19 +20,28 @@ import {
 
 function Sidebar() {
   const [health, setHealth] = useState(null)
+  const [alertCount, setAlertCount] = useState(0)
   const { user, logout } = useAuth()
 
   useEffect(() => {
-    const checkHealth = async () => {
+    const fetchData = async () => {
       try {
-        const data = await fetchPipelineHealth()
-        setHealth(data)
+        const healthData = await fetchPipelineHealth()
+        setHealth(healthData)
       } catch {
         setHealth({ status: 'error', services: { neo4j: 'down', redis: 'down', kafka: 'down' } })
       }
+      try {
+        const alertsData = await fetchAlerts({ limit: 1 })
+        if (alertsData && alertsData.total !== undefined) {
+          setAlertCount(alertsData.total)
+        }
+      } catch (err) {
+        console.error("Failed to fetch alert count", err)
+      }
     }
-    checkHealth()
-    const interval = setInterval(checkHealth, 15000)
+    fetchData()
+    const interval = setInterval(fetchData, 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -79,7 +88,7 @@ function Sidebar() {
         <NavLink to="/alerts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <span className="nav-icon"><Bell size={18} /></span>
           <span className="nav-label">Alerts</span>
-          <span className="nav-badge">12</span>
+          {alertCount > 0 && <span className="nav-badge">{alertCount}</span>}
         </NavLink>
 
         <div className="sidebar-section-label">ANALYSIS</div>

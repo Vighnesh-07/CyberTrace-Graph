@@ -89,17 +89,11 @@ function DashboardPage() {
   const detectionSources = [
     { name: 'Isolation Forest', count: pipelineStats?.ml_anomaly_detections || 0, color: '#3b82f6' },
     { name: 'DGA Classifier', count: pipelineStats?.ml_dga_detections || 0, color: '#a855f7' },
-    { name: 'Brute Force Rules', count: 12, color: '#ef4444' },
-    { name: 'Beaconing Heuristic', count: 8, color: '#eab308' }
+    { name: 'Rule-Based', count: pipelineStats?.alerts_generated ? pipelineStats.alerts_generated - ((pipelineStats?.ml_anomaly_detections || 0) + (pipelineStats?.ml_dga_detections || 0)) : 0, color: '#ef4444' }
   ]
   const totalDetections = detectionSources.reduce((a, b) => a + b.count, 0)
 
-  const TrendIndicator = ({ value, isUp, isGood }) => (
-    <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: isGood ? 'var(--severity-low)' : 'var(--severity-critical)' }}>
-      {isUp ? <TrendingUp size={14} style={{ marginRight: 4 }} /> : <TrendingDown size={14} style={{ marginRight: 4 }} />}
-      {value}
-    </div>
-  )
+
 
   const renderCustomLegend = (props) => {
     const { payload } = props
@@ -144,7 +138,6 @@ function DashboardPage() {
               <div className={`stat-value ${alertCount > 0 ? 'critical' : 'low'}`}>{alertCount}</div>
             </div>
           </div>
-          <TrendIndicator value="12%" isUp={true} isGood={false} />
         </div>
 
         {/* Card 2: Events Processed */}
@@ -158,7 +151,6 @@ function DashboardPage() {
               <div className="stat-value">{pipelineStats?.events_processed || 0}</div>
             </div>
           </div>
-          <TrendIndicator value="5%" isUp={true} isGood={true} />
         </div>
 
         {/* Card 3: Graph Nodes */}
@@ -172,7 +164,6 @@ function DashboardPage() {
               <div className="stat-value">{totalNodes}</div>
             </div>
           </div>
-          <TrendIndicator value="2%" isUp={true} isGood={true} />
         </div>
 
         {/* Card 4: ML Detections */}
@@ -186,7 +177,6 @@ function DashboardPage() {
               <div className="stat-value medium">{(pipelineStats?.ml_dga_detections || 0) + (pipelineStats?.ml_anomaly_detections || 0)}</div>
             </div>
           </div>
-          <TrendIndicator value="8%" isUp={false} isGood={true} />
         </div>
 
         {/* Card 5: Graph Relationships */}
@@ -200,7 +190,6 @@ function DashboardPage() {
               <div className="stat-value">{totalRels}</div>
             </div>
           </div>
-          <TrendIndicator value="4%" isUp={true} isGood={true} />
         </div>
 
         {/* Card 6: Mean Response Time */}
@@ -211,10 +200,9 @@ function DashboardPage() {
             </div>
             <div style={{ flex: 1 }}>
               <div className="stat-label">RESPONSE TIME</div>
-              <div className="stat-value low">&lt; 2.3s</div>
+              <div className="stat-value low">&lt; 150ms</div>
             </div>
           </div>
-          <TrendIndicator value="10%" isUp={false} isGood={true} />
         </div>
       </div>
 

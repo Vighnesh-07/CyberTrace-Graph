@@ -33,6 +33,10 @@ def main():
     kill_chain_parser.add_argument("--duration", type=int, default=300, help="Simulation duration in seconds")
     kill_chain_parser.add_argument("--output", type=str, choices=["json", "kafka"], default="json", help="Output destination")
     
+    ransomware_parser = subparsers.add_parser("ransomware", help="Simulate ransomware attack")
+    ransomware_parser.add_argument("--duration", type=int, default=60, help="Simulation duration in seconds")
+    ransomware_parser.add_argument("--output", type=str, choices=["json", "kafka"], default="json", help="Output destination")
+    
     list_parser = subparsers.add_parser("list", help="List available scenarios")
     
     args = parser.parse_args()
@@ -41,14 +45,18 @@ def main():
         print("\033[1mAvailable Scenarios:\033[0m")
         print("  - dns-tunnel : Simulates data exfiltration via DNS queries")
         print("  - kill-chain : Simulates a 4-stage lateral movement attack")
+        print("  - ransomware : Simulates a ransomware infection with shadow copy deletion")
         sys.exit(0)
         
-    elif args.command in ["dns-tunnel", "kill-chain"]:
+    elif args.command in ["dns-tunnel", "kill-chain", "ransomware"]:
         if args.command == "dns-tunnel":
             scenario = DNSTunnelingScenario(c2_domain=args.c2_domain)
-        else:
+        elif args.command == "kill-chain":
             from attack_simulator.scenarios.kill_chain import KillChainScenario
             scenario = KillChainScenario()
+        elif args.command == "ransomware":
+            from attack_simulator.scenarios.ransomware import RansomwareScenario
+            scenario = RansomwareScenario()
             
         events = scenario.generate_events(duration_seconds=args.duration)
         

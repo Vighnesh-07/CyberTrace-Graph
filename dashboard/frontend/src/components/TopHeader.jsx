@@ -65,7 +65,7 @@ function TopHeader() {
         <div className="header-action-group" ref={notifRef}>
           <button
             className="header-icon-btn"
-            onClick={() => { setShowNotifications(!showNotifications); setShowUserMenu(false) }}
+            onClick={(e) => { e.stopPropagation(); setShowNotifications(prev => !prev); setShowUserMenu(false); }}
             aria-label="Notifications"
           >
             <Bell size={18} />
@@ -104,7 +104,7 @@ function TopHeader() {
         <div className="header-action-group" ref={userRef}>
           <button
             className="header-user-btn"
-            onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifications(false) }}
+            onClick={(e) => { e.stopPropagation(); setShowUserMenu(prev => !prev); setShowNotifications(false); }}
           >
             <div className="header-avatar">
               {user?.username?.charAt(0).toUpperCase() || 'U'}
