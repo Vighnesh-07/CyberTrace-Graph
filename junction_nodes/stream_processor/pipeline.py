@@ -92,6 +92,12 @@ class ProcessingPipeline:
         from junction_nodes.stream_processor.detectors.ransomware import RansomwareDetector
         self.ransomware_detector = RansomwareDetector()
 
+        from junction_nodes.stream_processor.detectors.port_scan import PortScanDetector
+        self.port_scan_detector = PortScanDetector()
+
+        from junction_nodes.stream_processor.detectors.cred_dump import CredDumpDetector
+        self.cred_dump_detector = CredDumpDetector()
+
         self._running = False
         self._stats = {
             "events_processed": 0,
@@ -242,7 +248,7 @@ class ProcessingPipeline:
                 if "ml_correlated" in beacon_alert.tags:
                     self._stats["ml_anomaly_detections"] += 1
 
-        # Network events → beaconing detector + lateral movement
+        # Network events → beaconing detector + lateral movement + port scan
         elif event_type == "NETWORK_CONNECTION":
             beacon_alert = self.beaconing_detector.add_event(event_dict)
             if beacon_alert:
@@ -254,17 +260,25 @@ class ProcessingPipeline:
             if lm_alerts:
                 alerts.extend(lm_alerts)
                 
+            ps_alerts = self.port_scan_detector.add_event(event_dict)
+            if ps_alerts:
+                alerts.extend(ps_alerts)
+                
         # Auth events → lateral movement / brute force
         elif event_type in ["AUTH_LOGIN", "AUTH_FAILURE"]:
             lm_alerts = self.lateral_detector.add_event(event_dict)
             if lm_alerts:
                 alerts.extend(lm_alerts)
                 
-        # Process events → ransomware detector
+        # Process events → ransomware detector + cred dump
         elif event_type == "PROCESS_CREATION":
             ransomware_alerts = self.ransomware_detector.add_event(event_dict)
             if ransomware_alerts:
                 alerts.extend(ransomware_alerts)
+                
+            cd_alerts = self.cred_dump_detector.add_event(event_dict)
+            if cd_alerts:
+                alerts.extend(cd_alerts)
 
         return alerts
 

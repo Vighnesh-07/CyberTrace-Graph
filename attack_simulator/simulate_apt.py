@@ -36,6 +36,14 @@ def main():
     ransomware_parser = subparsers.add_parser("ransomware", help="Simulate ransomware attack")
     ransomware_parser.add_argument("--duration", type=int, default=60, help="Simulation duration in seconds")
     ransomware_parser.add_argument("--output", type=str, choices=["json", "kafka"], default="json", help="Output destination")
+
+    portscan_parser = subparsers.add_parser("port-scan", help="Simulate a fast port scan")
+    portscan_parser.add_argument("--duration", type=int, default=60, help="Simulation duration in seconds")
+    portscan_parser.add_argument("--output", type=str, choices=["json", "kafka"], default="json", help="Output destination")
+
+    creddump_parser = subparsers.add_parser("cred-dump", help="Simulate LSASS credential dumping")
+    creddump_parser.add_argument("--duration", type=int, default=60, help="Simulation duration in seconds")
+    creddump_parser.add_argument("--output", type=str, choices=["json", "kafka"], default="json", help="Output destination")
     
     list_parser = subparsers.add_parser("list", help="List available scenarios")
     
@@ -46,9 +54,11 @@ def main():
         print("  - dns-tunnel : Simulates data exfiltration via DNS queries")
         print("  - kill-chain : Simulates a 4-stage lateral movement attack")
         print("  - ransomware : Simulates a ransomware infection with shadow copy deletion")
+        print("  - port-scan  : Simulates a rapid port scan against a host")
+        print("  - cred-dump  : Simulates LSASS credential dumping")
         sys.exit(0)
         
-    elif args.command in ["dns-tunnel", "kill-chain", "ransomware"]:
+    elif args.command in ["dns-tunnel", "kill-chain", "ransomware", "port-scan", "cred-dump"]:
         if args.command == "dns-tunnel":
             scenario = DNSTunnelingScenario(c2_domain=args.c2_domain)
         elif args.command == "kill-chain":
@@ -57,6 +67,12 @@ def main():
         elif args.command == "ransomware":
             from attack_simulator.scenarios.ransomware import RansomwareScenario
             scenario = RansomwareScenario()
+        elif args.command == "port-scan":
+            from attack_simulator.scenarios.port_scan import PortScanScenario
+            scenario = PortScanScenario()
+        elif args.command == "cred-dump":
+            from attack_simulator.scenarios.cred_dump import CredDumpScenario
+            scenario = CredDumpScenario()
             
         events = scenario.generate_events(duration_seconds=args.duration)
         
@@ -77,6 +93,8 @@ def main():
                     topic = "apt.events.auth"
                 elif e.event_type == "NETWORK_CONNECTION":
                     topic = "apt.events.network"
+                elif e.event_type == "PROCESS_CREATION":
+                    topic = "apt.events.endpoint"
                 producer.produce(topic, e)
             producer.flush()
             print("\033[94mFinished sending to Kafka.\033[0m")
