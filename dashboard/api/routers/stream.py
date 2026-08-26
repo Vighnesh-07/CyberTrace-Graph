@@ -42,7 +42,18 @@ async def alert_event_generator(request: Request):
         await asyncio.sleep(3)
 
 
+from fastapi import Query, HTTPException, status
+from dashboard.api.core.security import SECRET_KEY, ALGORITHM
+from jose import jwt, JWTError
+
 @router.get("/alerts")
-async def stream_alerts(request: Request):
+async def stream_alerts(request: Request, token: str = Query(None)):
     """Stream real-time alerts via Server-Sent Events."""
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+    try:
+        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        
     return EventSourceResponse(alert_event_generator(request))

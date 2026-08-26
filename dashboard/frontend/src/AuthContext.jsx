@@ -21,42 +21,36 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (username, password) => {
-    // Mock authentication
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (username === 'admin' && password === 'admin') {
-          const payload = {
-            username: 'admin',
-            role: 'ADMIN',
-            exp: Math.floor(Date.now() / 1000) + (60 * 60)
-          };
-          const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-          const body = btoa(JSON.stringify(payload));
-          const signature = 'mock_signature';
-          const token = `${header}.${body}.${signature}`;
-          
-          localStorage.setItem('auth_token', token);
-          setUser(payload);
-          resolve(payload);
-        } else if (username === 'analyst' && password === 'analyst') {
-          const payload = {
-            username: 'analyst',
-            role: 'ANALYST',
-            exp: Math.floor(Date.now() / 1000) + (60 * 60)
-          };
-          const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-          const body = btoa(JSON.stringify(payload));
-          const signature = 'mock_signature';
-          const token = `${header}.${body}.${signature}`;
-          
-          localStorage.setItem('auth_token', token);
-          setUser(payload);
-          resolve(payload);
-        } else {
-          reject(new Error('Invalid credentials'));
-        }
-      }, 500); // simulate network delay
-    });
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          username,
+          password
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Invalid credentials');
+      }
+
+      const data = await response.json();
+      const token = data.access_token;
+      
+      // Parse the payload from the real JWT
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      // We don't have roles enforced in JWT yet, so we just attach it based on username
+      payload.role = username === 'admin' ? 'ADMIN' : 'ANALYST';
+      
+      localStorage.setItem('auth_token', token);
+      setUser(payload);
+      return payload;
+    } catch (err) {
+      throw err;
+    }
   };
 
   const logout = () => {

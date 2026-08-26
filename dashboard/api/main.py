@@ -17,9 +17,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import os
 from dashboard.api.services.neo4j_client import Neo4jClient
 from dashboard.api.services.redis_client import RedisClient
-from dashboard.api.routers import alerts, graph, pipeline, stream
+from dashboard.api.routers import alerts, graph, pipeline, stream, auth
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,11 +37,18 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle for the API."""
     logger.info("🚀 Starting CyberTrace-Graph Dashboard API...")
 
-    # Connect to Neo4j
+    # Connect to Neo4j securely
+    neo4j_user = os.getenv("NEO4J_USER", "neo4j")
+    neo4j_pass = os.getenv("NEO4J_PASSWORD")
+    
+    if not neo4j_pass:
+        logger.error("NEO4J_PASSWORD environment variable not set. Exiting.")
+        raise RuntimeError("Missing NEO4J_PASSWORD")
+
     app.state.neo4j = Neo4jClient(
         uri="bolt://localhost:7687",
-        user="neo4j",
-        password="apthunter2024",
+        user=neo4j_user,
+        password=neo4j_pass,
     )
     logger.info("✅ Connected to Neo4j")
 
@@ -71,11 +82,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from dashboard.api.core.security import get_current_user
+from fastapi import Depends
+
 # Mount routers
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
-app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"])
-app.include_router(stream.router, prefix="/api/stream", tags=["Stream"])
+app.include_router(auth.router)
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"], dependencies=[Depends(get_current_user)])
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"], dependencies=[Depends(get_current_user)])
+app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"], dependencies=[Depends(get_current_user)])
+app.include_router(stream.router, prefix="/api/stream", tags=["Stream"]) # SSE stream might need token in query param instead of header
 
 
 @app.get("/")

@@ -2,6 +2,9 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class SensorType(str, Enum):
     DNS = "DNS"
@@ -25,10 +28,12 @@ class SensorConfig(BaseModel):
     log_level: str = "INFO"
     buffer_max_size: int = 10000
 
+import os
+
 class Neo4jConfig(BaseModel):
     uri: str = "bolt://localhost:7687"
-    user: str = "neo4j"
-    password: str = "apthunter2024"
+    user: str = os.getenv("NEO4J_USER", "neo4j")
+    password: str = Field(default_factory=lambda: os.getenv("NEO4J_PASSWORD", ""))
 
 class RedisConfig(BaseModel):
     url: str = "redis://localhost:6379/0"

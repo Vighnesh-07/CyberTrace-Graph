@@ -8,8 +8,6 @@ kafka:
 
 neo4j:
   uri: "bolt://localhost:7687"
-  user: "neo4j"
-  password: "apthunter2024"
 
 input_topics:
   - "apt.events.enriched"
