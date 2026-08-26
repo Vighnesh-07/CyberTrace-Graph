@@ -106,6 +106,21 @@ flowchart TB
 
 ---
 
+## 🕵️‍♂️ Advanced Threat Hunting
+
+Because telemetry is natively mapped into a property graph, Senior Analysts can execute complex threat hunts in milliseconds that would require hundreds of lines of SPL/KQL in legacy SIEMs.
+
+**Detecting Lateral Movement (Pass-the-Hash / RDP Hopping):**
+```cypher
+MATCH path = (start:IPAddress)-[:LOGGED_IN_AS*2..5]->(target:IPAddress)
+WHERE start.is_internal = true AND target.is_critical = true
+RETURN path
+```
+
+*(See [ARCHITECTURE.md](ARCHITECTURE.md) for deeper technical specifications on our ML feature vectors, Graph Schemas, and pipeline design.)*
+
+---
+
 ## Comparison with Industry Tools
 
 > CyberTrace-Graph provides the graph-based lateral movement detection of advanced XDRs with the streaming capabilities of modern SIEMs.
