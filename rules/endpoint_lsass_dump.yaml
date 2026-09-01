@@ -1,0 +1,26 @@
+id: "win_lsass_memory_dump"
+name: "LSASS Memory Dump Detected"
+description: "Detects attempts to dump LSASS memory which often indicates credential theft (e.g. using procdump or mimikatz)."
+event_types:
+  - "PROCESS_CREATION"
+  - "PROCESS_ACCESS"
+conditions:
+  - field: "process_name"
+    operator: "in"
+    value: 
+      - "procdump.exe"
+      - "procdump64.exe"
+      - "mimikatz.exe"
+  - field: "command_line"
+    operator: "contains"
+    value: "lsass"
+mitre_tactic: "TA0006"
+mitre_technique: "T1003.001"
+tags:
+  - "credential_access"
+  - "lsass"
+  - "procdump"
+alert:
+  type: "CREDENTIAL_DUMPING"
+  severity: "CRITICAL"
+  confidence: 0.95

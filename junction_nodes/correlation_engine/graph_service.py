@@ -135,13 +135,106 @@ class GraphService:
     
     # ── High-level event ingestion ──────────────────────────────────
     
-    def _calculate_entropy(self, text: str) -> float:
+    def _calculate_entropy(self, s: str) -> float:
         """Calculate Shannon entropy of a string."""
-        if not text:
+        if not s:
             return 0.0
-        prob = [float(text.count(c)) / len(text) for c in set(text)]
-        return -sum(p * math.log2(p) for p in prob if p > 0)
-    
+        prob = [float(s.count(c)) / len(s) for c in set(s)]
+        return -sum(p * math.log(p, 2.0) for p in prob)
+
+    def prune_stale_graph(self, days: int = 7):
+        """Prunes benign nodes older than N days that are not tied to an alert."""
+        query = """
+        MATCH (n:IPAddress)
+        WHERE n.last_seen < datetime() - duration({days: $days})
+          AND NOT (n)<-[:TRIGGERED]-()
+        DETACH DELETE n
+        """
+        with self._driver.session() as session:
+            result = session.run(query, days=days)
+            deleted = result.consume().counters.nodes_deleted
+            logger.info(f"🧹 Pruned {deleted} stale IPAddress nodes older than {days} days.")
+
+    def batch_upsert_events(self, events: list[dict]) -> None:
+        """Micro-batching upsert using UNWIND for high throughput."""
+        if not events:
+            return
+            
+        logger.info(f"Batch upserting {len(events)} events to Neo4j...")
+        
+        # Split events into IPs, Domains, Connections, etc.
+        ips_to_upsert = {}
+        connections = []
+        
+        for e in events:
+            # Upsert IPs
+            for ip_key, geo_key, is_internal in [("source_ip", "source_geo", e.get("is_internal_ip", False)), ("destination_ip", "destination_geo", False)]:
+                ip = e.get(ip_key)
+                if ip:
+                    geo = e.get(geo_key) or {}
+                    ips_to_upsert[ip] = {
+                        "ip": ip,
+                        "is_internal": is_internal,
+                        "country_code": geo.get("country_code"),
+                        "country_name": geo.get("country_name"),
+                        "city": geo.get("city"),
+                        "asn": geo.get("asn"),
+                        "as_org": geo.get("as_org"),
+                        "is_vpn": geo.get("is_vpn", False),
+                        "is_tor": geo.get("is_tor", False)
+                    }
+                    
+            # Gather connections
+            if e.get("event_type") == "NETWORK_CONNECTION":
+                src = e.get("source_ip")
+                dst = e.get("destination_ip")
+                if src and dst:
+                    original = e.get("original_event", e)
+                    connections.append({
+                        "source_ip": src,
+                        "dest_ip": dst,
+                        "timestamp": e.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                        "protocol": original.get("protocol", "TCP"),
+                        "port": original.get("destination_port"),
+                        "bytes_sent": original.get("bytes_sent", 0)
+                    })
+                    
+        with self._driver.session() as session:
+            # 1. Batch upsert IPs
+            ip_query = """
+            UNWIND $batch AS p
+            MERGE (n:IPAddress {ip: p.ip})
+            ON CREATE SET n.first_seen = datetime(), n.is_internal = p.is_internal,
+                          n.country_code = p.country_code, n.country_name = p.country_name,
+                          n.city = p.city, n.asn = p.asn, n.as_org = p.as_org,
+                          n.is_vpn = p.is_vpn, n.is_tor = p.is_tor
+            ON MATCH SET n.last_seen = datetime()
+            """
+            if ips_to_upsert:
+                session.run(ip_query, batch=list(ips_to_upsert.values()))
+                self._stats["nodes_created"] += len(ips_to_upsert)
+                
+            # 2. Batch upsert connections
+            conn_query = """
+            UNWIND $batch AS c
+            MATCH (src:IPAddress {ip: c.source_ip})
+            MATCH (dst:IPAddress {ip: c.dest_ip})
+            MERGE (src)-[r:CONNECTED_TO]->(dst)
+            ON CREATE SET r.first_seen = datetime(c.timestamp), r.last_seen = datetime(c.timestamp), 
+                          r.protocol = c.protocol, r.port = c.port, r.bytes_sent = c.bytes_sent, r.count = 1
+            ON MATCH SET r.last_seen = datetime(c.timestamp), r.count = r.count + 1, r.bytes_sent = r.bytes_sent + c.bytes_sent
+            """
+            if connections:
+                session.run(conn_query, batch=connections)
+                self._stats["relationships_created"] += len(connections)
+                
+            self._stats["events_ingested"] += len(events)
+            
+        # Call the original ingest_enriched_event for any other event types that we didn't batch optimize yet
+        for e in events:
+            if e.get("event_type") != "NETWORK_CONNECTION":
+                self.ingest_enriched_event(e)
+
     def ingest_enriched_event(self, event_dict: dict) -> None:
         """Ingest a full enriched event into the graph.
         

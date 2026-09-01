@@ -17,13 +17,22 @@ class GraphIngestor:
     def __init__(self, kafka_config: KafkaConfig, neo4j_config: Neo4jConfig,
                  group_id: str = "cybertrace-graph-ingestor-01",
                  input_topics: list = None,
-                 detection_interval: int = 300):
+                 detection_interval: int = 300,
+                 batch_size: int = 500,
+                 batch_timeout: float = 1.0):
         self.input_topics = input_topics or ["apt.events.enriched", "apt.alerts.raw"]
         self.consumer = KafkaEventConsumer(kafka_config, group_id, self.input_topics)
         self.graph_service = GraphService(neo4j_config)
         self.graph_service.initialize_schema()
         self.detector = GraphDetector(self.graph_service)
         self.detection_interval = detection_interval
+        self.batch_size = batch_size
+        self.batch_timeout = batch_timeout
+        
+        self.event_buffer = []
+        self._last_flush_time = time.time()
+        self._last_prune_time = time.time()
+        
         self._running = False
         self._stats = {
             "events_ingested": 0,
@@ -55,7 +64,30 @@ class GraphIngestor:
                                 logger.warning(f"    → {f}")
             except Exception as e:
                 logger.error(f"Error running graph detections: {e}")
-    
+                
+        # Also maybe prune graph every 1 hour
+        if now - self._last_prune_time >= 3600:
+            self._last_prune_time = now
+            try:
+                self.graph_service.prune_stale_graph(days=7)
+            except Exception as e:
+                logger.error(f"Error pruning graph: {e}")
+
+    def _flush_buffer(self):
+        """Flush buffered events to Neo4j in a batch."""
+        if not self.event_buffer:
+            return
+            
+        try:
+            self.graph_service.batch_upsert_events(self.event_buffer)
+            self._stats["events_ingested"] += len(self.event_buffer)
+        except Exception as e:
+            logger.error(f"Error during batch upsert: {e}")
+            self._stats["errors"] += 1
+            
+        self.event_buffer.clear()
+        self._last_flush_time = time.time()
+
     def run(self):
         """Main ingestor loop."""
         self._running = True
@@ -64,23 +96,27 @@ class GraphIngestor:
         logger.info(f"Detection interval: {self.detection_interval}s")
         
         while self._running:
-            event = self.consumer.consume(timeout=1.0)
+            event = self.consumer.consume(timeout=self.batch_timeout)
+            now = time.time()
+            
             if event:
                 try:
                     if self._is_alert(event):
                         self.graph_service.ingest_alert(event)
                         self._stats["alerts_ingested"] += 1
                     else:
-                        self.graph_service.ingest_enriched_event(event)
-                        self._stats["events_ingested"] += 1
+                        self.event_buffer.append(event)
                 except Exception as e:
-                    logger.error(f"Error ingesting event: {e}")
+                    logger.error(f"Error processing event: {e}")
                     self._stats["errors"] += 1
+            
+            if len(self.event_buffer) >= self.batch_size or (now - self._last_flush_time) >= self.batch_timeout:
+                self._flush_buffer()
             
             self._maybe_run_detections()
             
             total = self._stats["events_ingested"] + self._stats["alerts_ingested"]
-            if total > 0 and total % 100 == 0:
+            if total > 0 and total % 500 == 0:
                 logger.info(f"📊 Ingestor stats: {self._stats}")
                 graph_stats = self.graph_service.get_stats()
                 logger.info(f"📊 Graph stats: {graph_stats}")
@@ -88,6 +124,7 @@ class GraphIngestor:
     def stop(self):
         """Gracefully stop the ingestor."""
         self._running = False
+        self._flush_buffer()
         self.consumer.close()
         self.graph_service.close()
         logger.info(f"Graph Ingestor stopped. Final stats: {self._stats}")

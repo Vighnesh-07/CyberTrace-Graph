@@ -1,0 +1,22 @@
+id: "auth_brute_force_spike"
+name: "High Volume Authentication Failures"
+description: "Detects a rapid spike in authentication failures from a single source IP, indicative of a brute force attack."
+event_types:
+  - "AUTH_FAILURE"
+conditions:
+  - field: "event_type"
+    operator: "=="
+    value: "AUTH_FAILURE"
+threshold:
+  count: 10
+  window_seconds: 60
+  group_by: "source_ip"
+mitre_tactic: "TA0006"
+mitre_technique: "T1110"
+tags:
+  - "auth"
+  - "brute_force"
+alert:
+  type: "ANOMALY_DETECTION"
+  severity: "MEDIUM"
+  confidence: 0.85

@@ -61,10 +61,15 @@ class ProcessingPipeline:
         self.geoip_service = GeoIPService()
         self.threat_intel_service = ThreatIntelService()
 
+from junction_nodes.stream_processor.rules.engine import RuleEngine
+
         # ── ML Models ───────────────────────────────────────────────────
         self.dga_classifier = None
         self.anomaly_detector = None
         self._init_ml_models(processor_config)
+
+        # ── Dynamic Rule Engine ─────────────────────────────────────────
+        self.rule_engine = RuleEngine(rules_dir="rules", redis_url="redis://localhost:6379/0")
 
         # ── Detection engines ───────────────────────────────────────────
         detector_cfg = processor_config.get("detectors", {})
@@ -87,13 +92,13 @@ class ProcessingPipeline:
             dga_classifier=self.dga_classifier,
         )
         
-        self.lateral_detector = LateralMovementDetector()
+        self.lateral_detector = LateralMovementDetector(redis_url="redis://localhost:6379/0")
         
         from junction_nodes.stream_processor.detectors.ransomware import RansomwareDetector
         self.ransomware_detector = RansomwareDetector()
 
         from junction_nodes.stream_processor.detectors.port_scan import PortScanDetector
-        self.port_scan_detector = PortScanDetector()
+        self.port_scan_detector = PortScanDetector(redis_url="redis://localhost:6379/0")
 
         from junction_nodes.stream_processor.detectors.cred_dump import CredDumpDetector
         self.cred_dump_detector = CredDumpDetector()
@@ -279,6 +284,11 @@ class ProcessingPipeline:
             cd_alerts = self.cred_dump_detector.add_event(event_dict)
             if cd_alerts:
                 alerts.extend(cd_alerts)
+                
+        # Run Dynamic Rule Engine
+        engine_alerts = self.rule_engine.process_event(event_dict)
+        if engine_alerts:
+            alerts.extend(engine_alerts)
 
         return alerts
 

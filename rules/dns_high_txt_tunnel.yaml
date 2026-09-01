@@ -1,0 +1,22 @@
+id: "dns_high_txt_tunnel"
+name: "DNS TXT Record Tunneling"
+description: "Detects an unusually high volume of TXT records being queried, which often indicates DNS tunneling."
+event_types:
+  - "DNS_QUERY"
+conditions:
+  - field: "query_type"
+    operator: "=="
+    value: "TXT"
+threshold:
+  count: 50
+  window_seconds: 60
+  group_by: "source_ip"
+mitre_tactic: "TA0011"
+mitre_technique: "T1071.004"
+tags:
+  - "c2"
+  - "dns_tunnel"
+alert:
+  type: "ANOMALY_DETECTION"
+  severity: "HIGH"
+  confidence: 0.90

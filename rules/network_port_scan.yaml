@@ -1,0 +1,22 @@
+id: "network_port_scan_yaml"
+name: "Network Port Scan (YAML)"
+description: "Detects a port scan via the dynamic rule engine."
+event_types:
+  - "NETWORK_CONNECTION"
+conditions:
+  - field: "event_type"
+    operator: "=="
+    value: "NETWORK_CONNECTION"
+threshold:
+  count: 20
+  window_seconds: 10
+  group_by: "source_ip"
+mitre_tactic: "TA0007"
+mitre_technique: "T1046"
+tags:
+  - "network_discovery"
+  - "port_scan"
+alert:
+  type: "PORT_SCAN"
+  severity: "MEDIUM"
+  confidence: 0.8
