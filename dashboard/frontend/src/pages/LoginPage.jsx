@@ -34,7 +34,7 @@ function LoginPage() {
       minHeight: '100vh',
       width: '100vw',
       background: 'var(--bg-base)',
-      margin: '-var(--space-xl)' // negate main content padding temporarily for full bleed
+      padding: 'var(--space-xl)'
     }}>
       <div className="card" style={{ width: '400px', padding: 'var(--space-xl)', boxShadow: 'var(--shadow-md)' }}>
         

@@ -7,6 +7,7 @@ import AlertsPage from './pages/AlertsPage'
 import GraphPage from './pages/GraphPage'
 import TimelinePage from './pages/TimelinePage'
 import LoginPage from './pages/LoginPage'
+import AuditPage from './pages/AuditPage'
 import './App.css'
 
 function ProtectedRoute({ children }) {
@@ -28,6 +29,7 @@ function MainLayout() {
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/graph" element={<GraphPage />} />
           <Route path="/timeline/:ip?" element={<TimelinePage />} />
+          <Route path="/audit" element={<AuditPage />} />
         </Routes>
       </main>
     </div>

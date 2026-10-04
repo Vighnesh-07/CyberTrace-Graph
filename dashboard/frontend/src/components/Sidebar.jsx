@@ -66,11 +66,11 @@ function Sidebar() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontWeight: 'bold', color: 'var(--accent-primary)'
             }}>
-              {user.username.charAt(0).toUpperCase()}
+              {(user?.username || user?.sub || 'A').charAt(0).toUpperCase()}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)' }}>{user.username}</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-elevated)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', marginTop: '4px', border: '1px solid var(--border-subtle)', width: 'fit-content' }}>{user.role}</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)' }}>{user?.username || user?.sub || 'admin'}</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-elevated)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', marginTop: '4px', border: '1px solid var(--border-subtle)', width: 'fit-content' }}>{user?.role || 'ADMIN'}</span>
             </div>
           </div>
           <button onClick={logout} className="btn btn-ghost" style={{ padding: '6px', color: 'var(--text-muted)' }} title="Logout">
@@ -102,6 +102,10 @@ function Sidebar() {
         </NavLink>
 
         <div className="sidebar-section-label">SYSTEM</div>
+        <NavLink to="/audit" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <span className="nav-icon">📋</span>
+          <span className="nav-label">Audit Log</span>
+        </NavLink>
         <a href="#" className="nav-item" onClick={(e) => e.preventDefault()} style={{ opacity: 0.6, cursor: 'not-allowed' }}>
           <span className="nav-icon"><Settings size={18} /></span>
           <span className="nav-label">Settings</span>

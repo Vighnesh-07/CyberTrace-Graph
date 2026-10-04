@@ -197,4 +197,5 @@ logs/
 *.log
 data/
 neo4j_logs*.txt
+creds.txt
 attack_simulator/output/

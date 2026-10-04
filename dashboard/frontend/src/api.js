@@ -81,19 +81,61 @@ export async function fetchPipelineStats() {
 }
 
 export async function fetchAnalyticsSeverity() {
-  const res = await fetch(`${API_BASE}/graph/analytics/severity-distribution`)
+  const res = await authFetch(`${API_BASE}/graph/analytics/severity-distribution`)
   if (!res.ok) throw new Error(`Failed to fetch severity analytics: ${res.status}`)
   return res.json()
 }
 
 export async function fetchAnalyticsTimeline() {
-  const res = await fetch(`${API_BASE}/graph/analytics/alert-timeline`)
+  const res = await authFetch(`${API_BASE}/graph/analytics/alert-timeline`)
   if (!res.ok) throw new Error(`Failed to fetch timeline analytics: ${res.status}`)
   return res.json()
 }
 
 export async function fetchAnalyticsTechniques() {
-  const res = await fetch(`${API_BASE}/graph/analytics/top-techniques`)
+  const res = await authFetch(`${API_BASE}/graph/analytics/top-techniques`)
   if (!res.ok) throw new Error(`Failed to fetch top techniques: ${res.status}`)
   return res.json()
+}
+
+export async function blockIP(ip, alertId, reason) {
+  const res = await authFetch(`${API_BASE}/soar/block-ip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ip, alert_id: alertId, reason }),
+  });
+  if (!res.ok) throw new Error(`Failed to block IP: ${res.status}`);
+  return res.json();
+}
+
+export async function isolateHost(hostname, alertId, reason) {
+  const res = await authFetch(`${API_BASE}/soar/isolate-host`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hostname, alert_id: alertId, reason }),
+  });
+  if (!res.ok) throw new Error(`Failed to isolate host: ${res.status}`);
+  return res.json();
+}
+
+export async function killProcess(hostname, processName, alertId, reason) {
+  const res = await authFetch(`${API_BASE}/soar/kill-process`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hostname, process_name: processName, alert_id: alertId, reason }),
+  });
+  if (!res.ok) throw new Error(`Failed to kill process: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchSOARActions(alertId) {
+  const res = await authFetch(`${API_BASE}/soar/actions?alert_id=${encodeURIComponent(alertId)}`);
+  if (!res.ok) throw new Error(`Failed to fetch SOAR actions: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchAuditLog(limit = 50) {
+  const res = await authFetch(`${API_BASE}/soar/audit-log?limit=${limit}`);
+  if (!res.ok) throw new Error(`Failed to fetch audit log: ${res.status}`);
+  return res.json();
 }

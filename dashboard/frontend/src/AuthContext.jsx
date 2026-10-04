@@ -7,11 +7,13 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check local storage for mock token
+    // Check local storage for token
     const token = localStorage.getItem('auth_token');
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
+        payload.username = payload.username || payload.sub || 'admin';
+        payload.role = payload.role || (payload.username === 'admin' ? 'ADMIN' : 'ANALYST');
         setUser(payload);
       } catch (e) {
         localStorage.removeItem('auth_token');
@@ -42,7 +44,7 @@ export function AuthProvider({ children }) {
       
       // Parse the payload from the real JWT
       const payload = JSON.parse(atob(token.split('.')[1]));
-      // We don't have roles enforced in JWT yet, so we just attach it based on username
+      payload.username = username || payload.sub || 'admin';
       payload.role = username === 'admin' ? 'ADMIN' : 'ANALYST';
       
       localStorage.setItem('auth_token', token);

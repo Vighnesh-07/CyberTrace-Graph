@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from dashboard.api.services.neo4j_client import Neo4jClient
 from dashboard.api.services.redis_client import RedisClient
-from dashboard.api.routers import alerts, graph, pipeline, stream, auth
+from dashboard.api.routers import alerts, graph, pipeline, stream, auth, soar
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -91,6 +91,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"], depende
 app.include_router(graph.router, prefix="/api/graph", tags=["Graph"], dependencies=[Depends(get_current_user)])
 app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"], dependencies=[Depends(get_current_user)])
 app.include_router(stream.router, prefix="/api/stream", tags=["Stream"]) # SSE stream might need token in query param instead of header
+app.include_router(soar.router, prefix="/api/soar", tags=["SOAR"])
 
 
 @app.get("/")

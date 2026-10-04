@@ -8,6 +8,8 @@ Node Labels:
 - Process: name, pid, command_line, file_hash, first_seen
 - Alert: alert_id (key), alert_type, severity, confidence_score, title, description, timestamp
 - MitreAttack: technique_id (key), tactic_id, technique_name, tactic_name
+- ResponseAction: action_id (key), action_type, target, status, executed_by, executed_at, reason, details
+- AuditLog: log_id (key), timestamp, user, action, target, alert_id, reason, details
 
 Relationship Types:
 - RESOLVED_TO: Domain -> IPAddress (timestamp, query_type)
@@ -19,6 +21,9 @@ Relationship Types:
 - TRIGGERED: IPAddress -> Alert (timestamp)
 - TARGETS: Alert -> Domain (timestamp)
 - MAPS_TO: Alert -> MitreAttack ()
+- RESPONDED_WITH: Alert -> ResponseAction ()
+- BLOCKED: ResponseAction -> IPAddress ()
+- ACTED_ON: ResponseAction -> Host ()
 """
 
 import logging
@@ -34,6 +39,8 @@ SCHEMA_CONSTRAINTS = [
     "CREATE CONSTRAINT user_unique IF NOT EXISTS FOR (n:User) REQUIRE n.username IS UNIQUE",
     "CREATE CONSTRAINT alert_unique IF NOT EXISTS FOR (n:Alert) REQUIRE n.alert_id IS UNIQUE",
     "CREATE CONSTRAINT mitre_unique IF NOT EXISTS FOR (n:MitreAttack) REQUIRE n.technique_id IS UNIQUE",
+    "CREATE CONSTRAINT response_action_unique IF NOT EXISTS FOR (n:ResponseAction) REQUIRE n.action_id IS UNIQUE",
+    "CREATE CONSTRAINT audit_log_unique IF NOT EXISTS FOR (n:AuditLog) REQUIRE n.log_id IS UNIQUE",
 ]
 
 # Index creation for faster lookups
@@ -43,6 +50,9 @@ SCHEMA_INDEXES = [
     "CREATE INDEX alert_type_idx IF NOT EXISTS FOR (n:Alert) ON (n.alert_type)",
     "CREATE INDEX alert_severity_idx IF NOT EXISTS FOR (n:Alert) ON (n.severity)",
     "CREATE INDEX mitre_tactic IF NOT EXISTS FOR (n:MitreAttack) ON (n.tactic_id)",
+    "CREATE INDEX audit_user_idx IF NOT EXISTS FOR (n:AuditLog) ON (n.user)",
+    "CREATE INDEX audit_action_idx IF NOT EXISTS FOR (n:AuditLog) ON (n.action)",
+    "CREATE INDEX response_action_type_idx IF NOT EXISTS FOR (n:ResponseAction) ON (n.action_type)",
 ]
 
 # MITRE ATT&CK reference data (the techniques we use in our detectors)
