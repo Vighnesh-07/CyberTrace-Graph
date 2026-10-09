@@ -23,6 +23,7 @@ from junction_nodes.common.kafka_producer import KafkaEventProducer
 from junction_nodes.stream_processor.consumer import KafkaEventConsumer
 from junction_nodes.stream_processor.models.alerts import EnrichedEvent, AlertEvent
 from junction_nodes.stream_processor.enrichment.geoip import GeoIPService
+from junction_nodes.stream_processor.rules.engine import RuleEngine
 from junction_nodes.stream_processor.enrichment.threat_intel import ThreatIntelService
 from junction_nodes.stream_processor.detectors.beaconing import BeaconingDetector
 from junction_nodes.stream_processor.detectors.dns_anomaly import DNSAnomalyDetector
@@ -60,8 +61,6 @@ class ProcessingPipeline:
         # Enrichment services
         self.geoip_service = GeoIPService()
         self.threat_intel_service = ThreatIntelService()
-
-from junction_nodes.stream_processor.rules.engine import RuleEngine
 
         # ── ML Models ───────────────────────────────────────────────────
         self.dga_classifier = None
