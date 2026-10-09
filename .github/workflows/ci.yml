@@ -27,7 +27,7 @@ jobs:
         # Install all microservice requirements
         find . -name "requirements.txt" -exec pip install -r {} \;
         # Install additional dependencies that might be missing from partial requirements
-        pip install httpx
+        pip install httpx python-dateutil
 
     - name: Run Pytest Suite
       env:
