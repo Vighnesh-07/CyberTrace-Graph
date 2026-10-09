@@ -1,88 +1,81 @@
-"""Shared pytest fixtures for the CyberTrace-Graph test suite."""
+"""
+CyberTrace-Graph Test Suite — Shared Fixtures & Configuration.
+
+Provides reusable mock objects for Redis, Neo4j, and Kafka
+to enable fast, isolated unit testing without external dependencies.
+"""
 
 import pytest
-from junction_nodes.common.models.events import (
-    DNSEvent, NetworkEvent, AuthEvent,
-    EventType, SeverityLevel,
-)
-from junction_nodes.common.config import KafkaConfig
+from unittest.mock import MagicMock, patch
+
+
+# ── Mock Redis Sliding Window ──────────────────────────────────────
+
+class MockSlidingWindow:
+    """In-memory replacement for RedisSlidingWindow for unit testing."""
+
+    def __init__(self, **kwargs):
+        self._data = {}  # key -> set of (member, timestamp)
+
+    def add(self, name: str, member: str, timestamp: float):
+        if name not in self._data:
+            self._data[name] = set()
+        self._data[name].add((member, timestamp))
+
+    def count(self, name: str, now: float) -> int:
+        if name not in self._data:
+            return 0
+        return len(self._data[name])
+
+    def clear(self, name: str):
+        self._data.pop(name, None)
+
+
+class MockRedisClient:
+    """In-memory replacement for redis.Redis for unit testing."""
+
+    def __init__(self):
+        self._store = {}
+
+    def get(self, key):
+        return self._store.get(key)
+
+    def setex(self, key, ttl, value):
+        self._store[key] = value
+
+    def delete(self, key):
+        self._store.pop(key, None)
+
+    def zadd(self, key, mapping):
+        pass
+
+    def zremrangebyscore(self, key, min_val, max_val):
+        pass
+
+    def zcard(self, key):
+        return 0
+
+    def expire(self, key, seconds):
+        pass
 
 
 @pytest.fixture
-def sample_dns_event():
-    """A normal, benign DNS event."""
-    return DNSEvent(
-        sensor_id="test-sensor",
-        sensor_type="DNS",
-        event_type=EventType.DNS_QUERY,
-        severity=SeverityLevel.LOW,
-        confidence_score=0.05,
-        source_ip="192.168.1.100",
-        destination_ip="8.8.8.8",
-        destination_port=53,
-        query_name="google.com",
-        query_type="A",
-        response_code="NOERROR",
-    )
+def mock_sliding_window():
+    """Returns a fresh MockSlidingWindow instance."""
+    return MockSlidingWindow()
 
 
 @pytest.fixture
-def sample_network_event():
-    """A normal network connection event."""
-    return NetworkEvent(
-        sensor_id="test-sensor",
-        sensor_type="NETWORK",
-        event_type=EventType.NETWORK_CONNECTION,
-        severity=SeverityLevel.LOW,
-        confidence_score=0.05,
-        source_ip="192.168.1.100",
-        source_port=12345,
-        destination_ip="8.8.8.8",
-        destination_port=443,
-        protocol="TCP",
-        bytes_sent=1024,
-        bytes_received=2048,
-    )
+def mock_redis_client():
+    """Returns a fresh MockRedisClient instance."""
+    return MockRedisClient()
 
 
 @pytest.fixture
-def sample_auth_event():
-    """A successful SSH authentication event."""
-    return AuthEvent(
-        sensor_id="test-sensor",
-        sensor_type="AUTH",
-        event_type=EventType.AUTH_LOGIN,
-        severity=SeverityLevel.LOW,
-        confidence_score=0.05,
-        username="admin",
-        source_ip="192.168.1.100",
-        destination_ip="192.168.1.10",
-        auth_method="ssh",
-        success=True,
-    )
-
-
-@pytest.fixture
-def suspicious_dns_event():
-    """A DNS event with a high-entropy subdomain (potential tunneling)."""
-    return DNSEvent(
-        sensor_id="test-sensor",
-        sensor_type="DNS",
-        event_type=EventType.DNS_QUERY,
-        severity=SeverityLevel.HIGH,
-        confidence_score=0.8,
-        source_ip="192.168.1.100",
-        destination_ip="8.8.8.8",
-        destination_port=53,
-        query_name="aGVsbG8gd29ybGQ.evil.xyz",
-        query_type="TXT",
-        response_code="NOERROR",
-        mitre_tactic="TA0010",
-        mitre_technique="T1048.003",
-    )
-
-
-@pytest.fixture
-def kafka_config():
-    """A KafkaConfig pointing to localhost for testing."""
-    return KafkaConfig(bootstrap_servers="localhost:9092")
+def mock_neo4j():
+    """Returns a MagicMock Neo4j client."""
+    client = MagicMock()
+    client._run_query.return_value = []
+    client.update_alert_status.return_value = None
+    client.get_alerts.return_value = []
+    return client

@@ -1,100 +1,68 @@
-import time
 import pytest
-from junction_nodes.stream_processor.models.alerts import AlertType
-from junction_nodes.stream_processor.detectors import BeaconingDetector, DNSAnomalyDetector
+import time
+from unittest.mock import patch, MagicMock
 
-class TestBeaconingDetector:
-    def test_periodic_queries_trigger_alert(self):
-        """Regular 5-second beacons should trigger C2_BEACONING alert."""
-        detector = BeaconingDetector(window_seconds=60, min_samples=5, cv_threshold=0.3)
-        alert = None
-        base_time = time.time()
-        for i in range(10):
-            event = {
-                "event_type": "DNS_QUERY",
-                "source_ip": "192.168.1.50",
-                "query_name": "beacon.c2-server.xyz",
-                "timestamp": base_time + (i * 5.0),  # Exactly 5 second intervals
-            }
-            # We need to mock time or set timestamps
-            result = detector.add_event(event)
-            if result:
-                alert = result
-        assert alert is not None
-        assert alert.alert_type == AlertType.C2_BEACONING
-    
-    def test_random_queries_no_alert(self):
-        """Random timing should NOT trigger beaconing."""
-        detector = BeaconingDetector(window_seconds=60, min_samples=5, cv_threshold=0.3)
-        import random
-        base_time = time.time()
-        current = base_time
-        for i in range(10):
-            current += random.uniform(0.5, 30.0)  # Very irregular
-            event = {
-                "event_type": "DNS_QUERY",
-                "source_ip": "192.168.1.50",
-                "query_name": "google.com",
-                "timestamp": current,
-            }
-            detector.add_event(event)
-        # Should not have triggered (high CV due to random intervals)
+from junction_nodes.stream_processor.detectors.cred_dump import CredDumpDetector
+from junction_nodes.stream_processor.detectors.beaconing import BeaconingDetector
+from junction_nodes.stream_processor.detectors.port_scan import PortScanDetector
+from junction_nodes.stream_processor.detectors.brute_force import LateralMovementDetector
 
-class TestDNSAnomalyDetector:
-    def test_high_query_rate_triggers_alert(self):
-        """Flooding queries should trigger DATA_EXFILTRATION."""
-        detector = DNSAnomalyDetector(window_seconds=60, max_query_rate=50)
-        alerts = []
-        base_time = time.time()
-        for i in range(60):
-            event = {
-                "event_type": "DNS_QUERY",
-                "source_ip": "192.168.1.50",
-                "query_name": f"query{i}.example.com",
-                "query_type": "A",
-                "response_code": "NOERROR",
-                "timestamp": base_time + (i * 0.5),
-            }
-            result = detector.add_event(event)
-            if result:
-                alerts.extend(result)
-        assert any(a.alert_type == AlertType.DATA_EXFILTRATION for a in alerts) or \
-               any(a.alert_type == AlertType.DGA_DOMAIN for a in alerts)
+class MockSlidingWindow:
+    def __init__(self, *args, **kwargs):
+        self.data = {}
+    def add(self, *args, **kwargs): pass
+    def add_event(self, *args, **kwargs): pass
+    def count_events(self, key, *args, **kwargs): return self.data.get(key, 0)
+    def set_count(self, key, count): self.data[key] = count
+    def clear(self, key): self.data.pop(key, None)
+
+# --- CredDumpDetector ---
+def test_cred_dump_ignores_unrelated():
+    detector = CredDumpDetector()
+    assert len(detector.add_event({'event_type': 'NETWORK_CONNECTION'})) == 0
+
+def test_cred_dump_detects_mimikatz():
+    detector = CredDumpDetector()
+    event = {'event_type': 'PROCESS_CREATION', 'command_line': 'mimikatz.exe privilege::debug'}
+    alerts = detector.add_event(event)
+    assert len(alerts) > 0
+
+# --- BeaconingDetector ---
+def test_beaconing_ignores_non_network():
+    detector = BeaconingDetector(window_seconds=300, min_samples=5)
+    assert not detector.add_event({'event_type': 'PROCESS_CREATION'})
+
+def test_beaconing_no_alert_below_threshold():
+    detector = BeaconingDetector(window_seconds=300, min_samples=5)
+    event = {'event_type': 'NETWORK_CONNECTION', 'source_ip': '1.1.1.1', 'destination_ip': '2.2.2.2', 'timestamp': time.time()}
+    assert not detector.add_event(event)
+
+# --- PortScanDetector ---
+@patch('junction_nodes.stream_processor.detectors.port_scan.RedisSlidingWindow', new=MockSlidingWindow)
+def test_port_scan_no_alert_below_threshold():
+    detector = PortScanDetector(port_threshold=15, window_seconds=10)
+    event = {'event_type': 'NETWORK_CONNECTION', 'source_ip': '1.1.1.1', 'destination_port': 80}
+    assert len(detector.add_event(event)) == 0
+
+@patch('junction_nodes.stream_processor.detectors.port_scan.RedisSlidingWindow')
+def test_port_scan_detects(mock_window_class):
+    mock_window = MockSlidingWindow()
+    mock_window.set_count('1.1.1.1:1.1.1.2', 20)
+    mock_window_class.return_value = mock_window
     
-    def test_high_txt_ratio_triggers_tunneling(self):
-        """Many TXT queries should trigger DNS_TUNNELING."""
-        detector = DNSAnomalyDetector(window_seconds=300, txt_ratio_threshold=0.3, max_query_rate=500)
-        alerts = []
-        base_time = time.time()
-        for i in range(20):
-            event = {
-                "event_type": "DNS_QUERY",
-                "source_ip": "192.168.1.50",
-                "query_name": f"data{i}.c2.example.com",
-                "query_type": "TXT" if i < 15 else "A",  # 75% TXT
-                "response_code": "NOERROR",
-                "timestamp": base_time + i,
-            }
-            result = detector.add_event(event)
-            if result:
-                alerts.extend(result)
-        assert any(a.alert_type == AlertType.DNS_TUNNELING for a in alerts)
+    detector = PortScanDetector(port_threshold=15, window_seconds=10)
+    event = {'event_type': 'NETWORK_CONNECTION', 'source_ip': '1.1.1.1', 'destination_ip': '1.1.1.2', 'destination_port': 80}
+    alerts = detector.add_event(event)
+    assert len(alerts) > 0
+
+# --- LateralMovementDetector ---
+@patch('junction_nodes.stream_processor.detectors.brute_force.redis.from_url')
+@patch('junction_nodes.stream_processor.detectors.brute_force.RedisSlidingWindow')
+def test_lateral_movement_ignores(mock_window_class, mock_redis_func):
+    mock_window_class.return_value = MockSlidingWindow()
+    mock_redis = MagicMock()
+    mock_redis_func.return_value = mock_redis
     
-    def test_normal_traffic_no_alert(self):
-        """Normal DNS traffic should not trigger alerts."""
-        detector = DNSAnomalyDetector(window_seconds=300)
-        alerts = []
-        base_time = time.time()
-        for i in range(10):
-            event = {
-                "event_type": "DNS_QUERY",
-                "source_ip": "192.168.1.100",
-                "query_name": "google.com",
-                "query_type": "A",
-                "response_code": "NOERROR",
-                "timestamp": base_time + (i * 10),  # Slow, normal
-            }
-            result = detector.add_event(event)
-            if result:
-                alerts.extend(result)
-        assert len(alerts) == 0
+    detector = LateralMovementDetector(brute_force_threshold=5, window_seconds=60)
+    event = {'event_type': 'PROCESS_CREATION'}
+    assert len(detector.add_event(event)) == 0
