@@ -1,0 +1,133 @@
+{
+  "ingestion_gateway": {
+    "count": 20000,
+    "total_time_s": 0.1367,
+    "throughput_eps": 146270.25,
+    "mean_ms": 0.0068,
+    "min_ms": 0.0053,
+    "p50_ms": 0.0061,
+    "p90_ms": 0.0074,
+    "p95_ms": 0.0089,
+    "p99_ms": 0.0162,
+    "max_ms": 0.7246,
+    "std_dev_ms": 0.0076,
+    "parsed_success": 20000
+  },
+  "stream_processor": {
+    "count": 20000,
+    "total_time_s": 0.5808,
+    "throughput_eps": 34433.84,
+    "mean_ms": 0.029,
+    "min_ms": 0.0027,
+    "p50_ms": 0.0123,
+    "p90_ms": 0.029,
+    "p95_ms": 0.0464,
+    "p99_ms": 0.5817,
+    "max_ms": 1.9391,
+    "std_dev_ms": 0.0917
+  },
+  "stream_processor_alerts": {
+    "RULE_ENGINE": 58,
+    "CRED_DUMP": 157,
+    "PORT_SCAN": 3,
+    "LATERAL_MOVEMENT": 2135,
+    "BEACONING": 0,
+    "RANSOMWARE": 112,
+    "DNS_ANOMALY": 7
+  },
+  "state_storage": {
+    "add_event": {
+      "count": 20000,
+      "total_time_s": 0.071,
+      "throughput_eps": 281627.87,
+      "mean_ms": 0.0036,
+      "min_ms": 0.0027,
+      "p50_ms": 0.003,
+      "p90_ms": 0.0037,
+      "p95_ms": 0.0048,
+      "p99_ms": 0.0094,
+      "max_ms": 0.4067,
+      "std_dev_ms": 0.0064
+    },
+    "count_events": {
+      "count": 6667,
+      "total_time_s": 0.0528,
+      "throughput_eps": 126339.77,
+      "mean_ms": 0.0079,
+      "min_ms": 0.0005,
+      "p50_ms": 0.0071,
+      "p90_ms": 0.0133,
+      "p95_ms": 0.0161,
+      "p99_ms": 0.0401,
+      "max_ms": 0.2067,
+      "std_dev_ms": 0.0081
+    }
+  },
+  "graph_micro_batch": {
+    "50": {
+      "count": 100,
+      "total_time_s": 0.0,
+      "throughput_eps": 3098469.35,
+      "mean_ms": 0.0003,
+      "min_ms": 0.0003,
+      "p50_ms": 0.0003,
+      "p90_ms": 0.0003,
+      "p95_ms": 0.0003,
+      "p99_ms": 0.0005,
+      "max_ms": 0.0007,
+      "std_dev_ms": 0.0
+    },
+    "100": {
+      "count": 50,
+      "total_time_s": 0.0,
+      "throughput_eps": 3020418.02,
+      "mean_ms": 0.0003,
+      "min_ms": 0.0003,
+      "p50_ms": 0.0003,
+      "p90_ms": 0.0004,
+      "p95_ms": 0.0004,
+      "p99_ms": 0.0004,
+      "max_ms": 0.0004,
+      "std_dev_ms": 0.0
+    },
+    "250": {
+      "count": 20,
+      "total_time_s": 0.0,
+      "throughput_eps": 3027550.71,
+      "mean_ms": 0.0003,
+      "min_ms": 0.0003,
+      "p50_ms": 0.0003,
+      "p90_ms": 0.0003,
+      "p95_ms": 0.0003,
+      "p99_ms": 0.0004,
+      "max_ms": 0.0004,
+      "std_dev_ms": 0.0
+    },
+    "500": {
+      "count": 10,
+      "total_time_s": 0.0,
+      "throughput_eps": 3163956.21,
+      "mean_ms": 0.0003,
+      "min_ms": 0.0003,
+      "p50_ms": 0.0003,
+      "p90_ms": 0.0003,
+      "p95_ms": 0.0003,
+      "p99_ms": 0.0003,
+      "max_ms": 0.0003,
+      "std_dev_ms": 0.0
+    },
+    "1000": {
+      "count": 5,
+      "total_time_s": 0.0,
+      "throughput_eps": 3343587.0,
+      "mean_ms": 0.0003,
+      "min_ms": 0.0003,
+      "p50_ms": 0.0003,
+      "p90_ms": 0.0003,
+      "p95_ms": 0.0003,
+      "p99_ms": 0.0003,
+      "max_ms": 0.0003,
+      "std_dev_ms": 0.0
+    }
+  }
+}

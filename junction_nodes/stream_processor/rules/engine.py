@@ -107,10 +107,18 @@ class RuleEngine:
             except KeyError:
                 severity = SeverityLevel.MEDIUM
                 
-            try:
-                alert_type = AlertType[alert_cfg.get("type", "ANOMALY_DETECTION").upper()]
-            except KeyError:
-                alert_type = AlertType.ANOMALY_DETECTION
+            raw_type = alert_cfg.get("type", "ANOMALY").upper()
+            type_mapping = {
+                "ANOMALY_DETECTION": AlertType.ANOMALY,
+                "CREDENTIAL_DUMP": AlertType.CREDENTIAL_DUMPING,
+            }
+            if raw_type in type_mapping:
+                alert_type = type_mapping[raw_type]
+            else:
+                try:
+                    alert_type = AlertType[raw_type]
+                except KeyError:
+                    alert_type = AlertType.ANOMALY
                 
             alerts.append(AlertEvent(
                 alert_type=alert_type,

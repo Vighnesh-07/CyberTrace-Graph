@@ -85,6 +85,7 @@ class BeaconingDetector:
             self._timestamps[key] = []
             
         self._timestamps[key].append(current_time)
+        self._timestamps[key].sort()
         self._cleanup(key, current_time)
         
         timestamps = self._timestamps[key]
@@ -107,8 +108,8 @@ class BeaconingDetector:
             cv = std_interval / mean_interval
             
             if cv < self.cv_threshold:
-                # Base confidence from CV analysis
-                base_confidence = 1.0 - cv
+                # Base confidence from CV analysis (clamped to [0.0, 1.0])
+                base_confidence = max(0.0, min(1.0, 1.0 - abs(cv)))
                 
                 # Cross-validate with Isolation Forest if available
                 anomaly_score = None

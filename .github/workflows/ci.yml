@@ -33,4 +33,4 @@ jobs:
       env:
         PYTHONPATH: .
       run: |
-        pytest tests/test_detectors.py tests/test_rules.py tests/test_ingestion.py tests/test_soar.py -v --tb=short
+        pytest tests/test_benchmark.py tests/test_detectors.py tests/test_rules.py tests/test_ingestion.py tests/test_soar.py -v --tb=short

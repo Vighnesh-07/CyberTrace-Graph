@@ -62,7 +62,7 @@ class LateralMovementDetector:
                 
                 if failures_count == self.brute_force_threshold:
                     alerts.append(AlertEvent(
-                        alert_type=AlertType.ANOMALY_DETECTION,
+                        alert_type=AlertType.BRUTE_FORCE,
                         severity=SeverityLevel.MEDIUM,
                         confidence_score=0.85,
                         title="Brute Force Attempt Detected",
@@ -85,7 +85,7 @@ class LateralMovementDetector:
                     # Successful login AFTER brute force
                     self.redis_client.setex(f"{self.compromise_prefix}{target_host}", 86400, "1")
                     alerts.append(AlertEvent(
-                        alert_type=AlertType.ANOMALY_DETECTION,
+                        alert_type=AlertType.ANOMALY,
                         severity=SeverityLevel.CRITICAL,
                         confidence_score=0.98,
                         title="Account Compromise",
@@ -100,7 +100,7 @@ class LateralMovementDetector:
                     self.redis_client.setex(f"{self.compromise_prefix}{target_host}", 86400, "1")
                     # Generate a high confidence alert since we know this is a simulated attack scenario
                     alerts.append(AlertEvent(
-                        alert_type=AlertType.ANOMALY_DETECTION,
+                        alert_type=AlertType.ANOMALY,
                         severity=SeverityLevel.HIGH,
                         confidence_score=0.9,
                         title="Suspicious Login",
@@ -124,7 +124,7 @@ class LateralMovementDetector:
                     
                 if is_internal:
                     alerts.append(AlertEvent(
-                        alert_type=AlertType.ANOMALY_DETECTION,
+                        alert_type=AlertType.LATERAL_MOVEMENT,
                         severity=SeverityLevel.HIGH,
                         confidence_score=0.9,
                         title="Lateral Movement Detected",
