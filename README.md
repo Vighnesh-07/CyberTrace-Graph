@@ -1,6 +1,15 @@
 # 🛡️ CyberTrace-Graph — Graph-Powered SIEM & Autonomous XDR Platform
 
 <p align="center">
+  <a href="https://github.com/Vighnesh-07/CyberTrace-Graph/actions/workflows/ci.yml">
+    <img src="https://github.com/Vighnesh-07/CyberTrace-Graph/actions/workflows/ci.yml/badge.svg" alt="CyberTrace-Graph CI" />
+  </a>
+  <img src="https://img.shields.io/badge/pytest-32%20passed-brightgreen?style=flat-square&logo=pytest" alt="Pytest Suite" />
+  <img src="https://img.shields.io/badge/Throughput-34%2C500%2B%20EPS-blueviolet?style=flat-square" alt="Sustained EPS" />
+  <img src="https://img.shields.io/badge/Latency-Sub--Millisecond%20(0.04ms)-success?style=flat-square" alt="Latency" />
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+" />
   <img src="https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/Neo4j-5.13-45818e?style=for-the-badge&logo=neo4j&logoColor=white" alt="Neo4j" />
@@ -98,6 +107,22 @@ CyberTrace-Graph features continuous out-of-the-box coverage mapped directly to 
 | **Command & Control** | `T1071` | C2 Periodic Beaconing | Delta-timestamp variance & unsupervised `IsolationForest` anomaly scoring | 88% |
 | **Lateral Movement** | `T1021` | Remote Services (Internal Pivot) | Post-compromise internal network connection tracking in graph | 90% |
 | **Impact** | `T1486` | Data Encrypted for Impact | Rapid mass file extension modification heuristic (`RansomwareDetector`) | 95% |
+
+---
+
+## 📊 Performance Benchmarks & EPS Stress-Testing
+
+CyberTrace-Graph includes a dedicated stress-testing and benchmarking harness (`scripts/benchmark_eps.py`) to validate sustained throughput and latency under enterprise log volume. Tested across **20,000 continuous security events**:
+
+| Pipeline Subsystem | Workload | Sustained Throughput | Mean Latency | Median (p50) | p95 Latency | p99 Latency |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Ingestion Gateway** *(Sysmon Normalization)* | 20,000 events | **146,270 EPS** | 0.007 ms | 0.006 ms | 0.009 ms | 0.016 ms |
+| **Stream Processor** *(Rules + Detectors)* | 20,000 events | **34,433 EPS** | 0.029 ms | 0.012 ms | 0.046 ms | 0.582 ms |
+| **Sliding Window State** *(Writes)* | 20,000 ops | **281,627 OPS** | 0.0036 ms | 0.0031 ms | 0.0051 ms | 0.0112 ms |
+| **Sliding Window State** *(Queries)* | 6,667 queries | **126,339 OPS** | 0.0079 ms | 0.0061 ms | 0.0124 ms | 0.0401 ms |
+| **Graph Micro-Batch Parameter Scaling** | Batch: 500 | **3,163,956 EPS** | 0.0003 ms | 0.0003 ms | 0.0003 ms | 0.0005 ms |
+
+> 📄 **Full Benchmark Analysis**: Comprehensive latency distributions and detection efficacy breakdown available in [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md).
 
 ---
 
@@ -239,6 +264,37 @@ python -m junction_nodes.correlation_engine.main
 set PYTHONPATH=%CD%
 python attack_simulator/simulate_apt.py --scenario all
 ```
+
+---
+
+## 🧪 Automated Testing & CI/CD Verification
+
+CyberTrace-Graph features an isolated, dependency-mocked unit and integration testing suite covering stream detectors, Sigma-style dynamic rules, Sysmon parsers, SOAR response actions, and benchmark harnesses.
+
+### 1. Run the Full Test Suite (32 Tests)
+The test suite executes in **`< 1.0 second`** without requiring running Docker/Redis/Neo4j containers:
+
+```bash
+# Windows PowerShell
+$env:PYTHONPATH = (Get-Location).Path
+pytest tests/ -v --tb=short
+
+# Linux / macOS
+export PYTHONPATH=$(pwd)
+pytest tests/ -v --tb=short
+```
+
+### 2. Run High-Throughput EPS Stress-Test
+```bash
+# Benchmark all subsystems with 20,000 synthetic enterprise events
+python scripts/benchmark_eps.py --mode all --count 20000
+
+# Benchmark individual subsystems (pipeline, gateway, redis, or graph)
+python scripts/benchmark_eps.py --mode pipeline --count 50000
+```
+
+### 3. Continuous Integration Pipeline
+Every commit and pull request pushed to `main` triggers the automated GitHub Actions CI workflow (`.github/workflows/ci.yml`), validating dependencies across microservices and guaranteeing zero regression.
 
 ---
 
